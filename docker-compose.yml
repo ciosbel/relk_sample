@@ -1,0 +1,60 @@
+version: "3.6"
+
+networks:
+  rabbitmq-prometheus:
+    name: docker_rabbitmq-prometheus
+    external: true
+
+services:
+
+  # rabbitmq:
+  #   image: rabbitmq:3.12-management-alpine
+  #   container_name: 'rabbitmq'
+  #   ports:
+  #     - "5672:5672"
+  #     - "15672:15672"
+  #   volumes:
+  #       - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+  #       - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+  #   networks:
+  #     - relk
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.14
+    container_name: 'elasticsearch'
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    networks: 
+      - rabbitmq-prometheus
+
+  logstash:
+    #image: docker.elastic.co/logstash/logstash:7.17.14
+    build: 
+      context: ./logstash
+    container_name: 'logstash'
+    depends_on: 
+      - elasticsearch
+    volumes:
+      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    #command: bash -c "bin/logstash-plugin install logstash-integration-rabbitmq && logstash --config.reload.automatic -f /usr/share/logstash/pipeline/logstash.conf"
+    networks:
+      - rabbitmq-prometheus
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.14
+    container_name: 'kibana'
+    depends_on:
+      - logstash
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - rabbitmq-prometheus
+
+# networks:
+#   relk:
+#     driver: bridge
